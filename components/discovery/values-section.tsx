@@ -1,15 +1,24 @@
 "use client"
 
 import { Textarea } from "@/components/ui/textarea"
+import { toast } from "@/components/ui/use-toast"
+import { AlertCircle } from "lucide-react"
 
 interface ValuesSectionProps {
   selectedValues: string[]
   setSelectedValues: (values: string[]) => void
   valuesInfo: string
   setValuesInfo: (info: string) => void
+  maxSelections?: number
 }
 
-export function ValuesSection({ selectedValues, setSelectedValues, valuesInfo, setValuesInfo }: ValuesSectionProps) {
+export function ValuesSection({ 
+  selectedValues, 
+  setSelectedValues, 
+  valuesInfo, 
+  setValuesInfo,
+  maxSelections = 5 
+}: ValuesSectionProps) {
   const values = [
     "Achievement",
     "Adventure",
@@ -50,17 +59,37 @@ export function ValuesSection({ selectedValues, setSelectedValues, valuesInfo, s
     if (selectedValues.includes(value)) {
       setSelectedValues(selectedValues.filter((v) => v !== value))
     } else {
+      if (selectedValues.length >= maxSelections) {
+        toast({
+          title: "Maximum selections reached",
+          description: `You can only select up to ${maxSelections} values`,
+          variant: "destructive",
+        })
+        return
+      }
       setSelectedValues([...selectedValues, value])
     }
   }
 
   return (
-    <div className="border rounded-lg p-6 bg-white shadow-sm">
-      <h2 className="text-2xl font-semibold mb-4">Values</h2>
+    <div className="mt-4">
       <p className="text-muted-foreground mb-6">
         Select the values that are most important to you in your career. This helps us find roles that align with what
         matters to you.
       </p>
+
+      {selectedValues.length >= maxSelections && (
+        <div className="bg-amber-50 border border-amber-200 rounded-md p-3 mb-4 flex items-start gap-2">
+          <AlertCircle className="h-5 w-5 text-amber-500 mt-0.5" />
+          <div>
+            <p className="text-amber-800 font-medium">Maximum selections reached</p>
+            <p className="text-sm text-amber-700">
+              You've selected {selectedValues.length} out of {maxSelections} possible values. 
+              Remove an item if you want to select a different one.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-2 mb-6">
         {values.map((value) => (
@@ -77,6 +106,28 @@ export function ValuesSection({ selectedValues, setSelectedValues, valuesInfo, s
             {value}
           </button>
         ))}
+      </div>
+
+      <div className="flex flex-wrap gap-2 mb-6">
+        <p className="w-full text-sm font-medium text-slate-500">
+          Selected values ({selectedValues.length}/{maxSelections}):
+        </p>
+        {selectedValues.length > 0 ? (
+          selectedValues.map((value) => (
+            <div key={value} className="bg-primary/10 text-primary px-3 py-1 rounded-full text-sm flex gap-2 items-center">
+              {value}
+              <button 
+                type="button" 
+                onClick={() => setSelectedValues(selectedValues.filter(v => v !== value))}
+                className="hover:bg-primary/20 rounded-full h-5 w-5 inline-flex items-center justify-center"
+              >
+                ×
+              </button>
+            </div>
+          ))
+        ) : (
+          <p className="text-sm text-slate-400 italic">No values selected yet</p>
+        )}
       </div>
 
       <div className="mt-6">

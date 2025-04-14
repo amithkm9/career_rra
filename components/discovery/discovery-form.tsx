@@ -2,10 +2,10 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Loader2, Upload, CheckCircle2, AlertCircle } from "lucide-react"
+import { Loader2, Upload, CheckCircle2, AlertCircle, ChevronDown, ChevronUp } from "lucide-react"
 import { InterestsSection } from "./interests-section"
 import { SkillsSection } from "./skills-section"
 import { ValuesSection } from "./values-section"
@@ -36,8 +36,16 @@ export function DiscoveryForm() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [uploadStatus, setUploadStatus] = useState<"idle" | "uploading" | "success" | "error">("idle")
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const [loadingData, setLoadingData] = useState(true)
   const router = useRouter()
   const { user } = useAuth()
+
+  // Collapsible state
+  const [sections, setSections] = useState({
+    interests: true,
+    skills: false,
+    values: false
+  })
 
   // Selected items state
   const [selectedInterests, setSelectedInterests] = useState<string[]>([])
@@ -51,6 +59,65 @@ export function DiscoveryForm() {
 
   // Resume path after upload (for internal reference)
   const [resumePath, setResumePath] = useState<string | null>(null)
+
+  // Fetch user data on component mount
+  useEffect(() => {
+    const fetchUserData = async () => {
+      if (!user) {
+        setLoadingData(false)
+        return
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("discovery_data, resume_link")
+          .eq("id", user.id)
+          .single()
+
+        if (error) {
+          throw error
+        }
+
+        if (data && data.discovery_data) {
+          const discoveryData = data.discovery_data as DiscoveryData
+          
+          // Set selected items
+          setSelectedInterests(discoveryData.interests.selected || [])
+          setSelectedSkills(discoveryData.skills.selected || [])
+          setSelectedValues(discoveryData.values.selected || [])
+          
+          // Set additional info
+          setInterestsInfo(discoveryData.interests.additional_info || "")
+          setSkillsInfo(discoveryData.skills.additional_info || "")
+          setValuesInfo(discoveryData.values.additional_info || "")
+        }
+
+        if (data && data.resume_link) {
+          // The resume has already been uploaded
+          setUploadStatus("success")
+        }
+      } catch (error) {
+        console.error("Error fetching user data:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load your profile data. Please try again.",
+          variant: "destructive",
+        })
+      } finally {
+        setLoadingData(false)
+      }
+    }
+
+    fetchUserData()
+  }, [user])
+
+  const toggleSection = (section: 'interests' | 'skills' | 'values') => {
+    setSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }))
+  }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -174,6 +241,16 @@ export function DiscoveryForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    // Validate that no more than 5 items are selected in each category
+    if (selectedInterests.length > 5 || selectedSkills.length > 5 || selectedValues.length > 5) {
+      toast({
+        title: "Too many selections",
+        description: "Please select no more than 5 options in each category",
+        variant: "destructive",
+      })
+      return
+    }
+
     // Validate form
     if (selectedInterests.length === 0 || selectedSkills.length === 0 || selectedValues.length === 0) {
       toast({
@@ -227,7 +304,7 @@ export function DiscoveryForm() {
 
       // If we have a resume path, get a signed URL and add it to the profile update
       if (finalResumePath) {
-        // Create a signed URL that expires in 7 days (604800 seconds)
+        // Create a signed URL that expires in 1 year (31536000 seconds)
         const { data: signedUrlData, error: signedUrlError } = await supabase.storage
           .from("resumes")
           .createSignedUrl(finalResumePath, 31536000)
@@ -267,31 +344,76 @@ export function DiscoveryForm() {
     }
   }
 
+  if (loadingData) {
+    return (
+      <div className="flex justify-center items-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-2">Loading your profile data...</span>
+      </div>
+    )
+  }
+
   return (
     <form onSubmit={handleSubmit} className="space-y-12">
       {/* Interests Section */}
-      <InterestsSection
-        selectedInterests={selectedInterests}
-        setSelectedInterests={setSelectedInterests}
-        interestsInfo={interestsInfo}
-        setInterestsInfo={setInterestsInfo}
-      />
+      <div className="border rounded-lg p-6 bg-white shadow-sm">
+        <div className="flex justify-between items-center cursor-pointer" onClick={() => toggleSection('interests')}>
+          <h2 className="text-2xl font-semibold">Interests</h2>
+          <Button variant="ghost" size="sm" type="button">
+            {sections.interests ? <ChevronUp className="h-6 w-6" /> : <ChevronDown className="h-6 w-6" />}
+          </Button>
+        </div>
+        
+        {sections.interests && (
+          <InterestsSection
+            selectedInterests={selectedInterests}
+            setSelectedInterests={setSelectedInterests}
+            interestsInfo={interestsInfo}
+            setInterestsInfo={setInterestsInfo}
+            maxSelections={5}
+          />
+        )}
+      </div>
 
       {/* Skills Section */}
-      <SkillsSection
-        selectedSkills={selectedSkills}
-        setSelectedSkills={setSelectedSkills}
-        skillsInfo={skillsInfo}
-        setSkillsInfo={setSkillsInfo}
-      />
+      <div className="border rounded-lg p-6 bg-white shadow-sm">
+        <div className="flex justify-between items-center cursor-pointer" onClick={() => toggleSection('skills')}>
+          <h2 className="text-2xl font-semibold">Skills</h2>
+          <Button variant="ghost" size="sm" type="button">
+            {sections.skills ? <ChevronUp className="h-6 w-6" /> : <ChevronDown className="h-6 w-6" />}
+          </Button>
+        </div>
+        
+        {sections.skills && (
+          <SkillsSection
+            selectedSkills={selectedSkills}
+            setSelectedSkills={setSelectedSkills}
+            skillsInfo={skillsInfo}
+            setSkillsInfo={setSkillsInfo}
+            maxSelections={5}
+          />
+        )}
+      </div>
 
       {/* Values Section */}
-      <ValuesSection
-        selectedValues={selectedValues}
-        setSelectedValues={setSelectedValues}
-        valuesInfo={valuesInfo}
-        setValuesInfo={setValuesInfo}
-      />
+      <div className="border rounded-lg p-6 bg-white shadow-sm">
+        <div className="flex justify-between items-center cursor-pointer" onClick={() => toggleSection('values')}>
+          <h2 className="text-2xl font-semibold">Values</h2>
+          <Button variant="ghost" size="sm" type="button">
+            {sections.values ? <ChevronUp className="h-6 w-6" /> : <ChevronDown className="h-6 w-6" />}
+          </Button>
+        </div>
+        
+        {sections.values && (
+          <ValuesSection
+            selectedValues={selectedValues}
+            setSelectedValues={setSelectedValues}
+            valuesInfo={valuesInfo}
+            setValuesInfo={setValuesInfo}
+            maxSelections={5}
+          />
+        )}
+      </div>
 
       {/* CV Upload Section */}
       <div className="border rounded-lg p-6 bg-white shadow-sm">
@@ -350,7 +472,7 @@ export function DiscoveryForm() {
             <div className="flex flex-col items-center">
               <CheckCircle2 className="h-10 w-10 text-green-500 mb-4" />
               <p className="text-green-600 font-medium">Resume uploaded successfully!</p>
-              <p className="text-sm text-gray-500 mt-2">{selectedFile?.name}</p>
+              <p className="text-sm text-gray-500 mt-2">{selectedFile?.name || "Your resume is saved"}</p>
               <Button
                 type="button"
                 variant="outline"
