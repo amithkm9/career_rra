@@ -19,6 +19,28 @@ const client = new ModelClient(
   new AzureKeyCredential(azureInferenceKey)
 );
 
+// Default recommendations to use as fallback
+const defaultRecommendations = [
+  {
+    "role_title": "Software Developer",
+    "description": "Software developers create applications and systems that run on computers and other devices. They design, code, test, and maintain software solutions for various problems and needs.",
+    "why_it_fits_professionally": "Your technical skills and problem-solving abilities would make you a strong candidate for software development roles. Your experience with analytical thinking aligns well with the core competencies needed.",
+    "why_it_fits_personally": "Your interest in creating solutions and solving complex problems makes software development a fulfilling career path that matches your personal interests."
+  },
+  {
+    "role_title": "Data Analyst",
+    "description": "Data analysts examine datasets to identify trends and draw conclusions. They present findings to help organizations make better business decisions.",
+    "why_it_fits_professionally": "Your analytical thinking skills and attention to detail would serve you well as a data analyst. This role leverages your abilities to find patterns and insights in complex information.",
+    "why_it_fits_personally": "Your curiosity and interest in uncovering insights from information makes data analysis a personally satisfying career that aligns with your values."
+  },
+  {
+    "role_title": "Product Manager",
+    "description": "Product managers oversee the development of products from conception to launch. They define product strategy, gather requirements, and coordinate with different teams to ensure successful delivery.",
+    "why_it_fits_professionally": "Your combination of technical understanding and strategic planning abilities makes product management a good professional fit. This role utilizes both your analytical and communication skills.",
+    "why_it_fits_personally": "Your interest in both the business and technical aspects of products, along with your desire to create meaningful solutions, aligns well with product management."
+  }
+];
+
 export async function POST(request: NextRequest) {
   try {
     // Get user ID from request body
@@ -38,20 +60,17 @@ export async function POST(request: NextRequest) {
       .eq("id", userId)
       .single();
 
-    if (profileError || !profileData) {
-      return NextResponse.json(
-        { error: "Failed to fetch user profile data" },
-        { status: 404 }
-      );
+    if (profileError) {
+      console.error("Error fetching profile data:", profileError);
+      return NextResponse.json({ recommendations: defaultRecommendations });
     }
 
-    const discoveryData = profileData.discovery_data;
+    const discoveryData = profileData?.discovery_data;
 
+    // Instead of returning 404, return default recommendations if no discovery data
     if (!discoveryData) {
-      return NextResponse.json(
-        { error: "No discovery data found for user" },
-        { status: 404 }
-      );
+      console.log("No discovery data for user, returning default recommendations");
+      return NextResponse.json({ recommendations: defaultRecommendations });
     }
 
     // Prepare the prompt for Azure OpenAI
@@ -124,90 +143,73 @@ export async function POST(request: NextRequest) {
       },
     ];
 
-    // Make the API call to Azure OpenAI
-    const response = await client.path("chat/completions").post({
-      body: {
-        messages: messages,
-        max_tokens: 1500,
-        model: deploymentName,
-      },
-    });
-
-    if (!response.body) {
-      return NextResponse.json(
-        { error: "No response from Azure OpenAI" },
-        { status: 500 }
-      );
-    }
-
-    // Parse the response
-    let roleRecommendations;
     try {
-      const responseContent = response.body.choices[0].message.content;
-      console.log("Raw response from Azure OpenAI:", responseContent);
-      
-      // Try to clean the response if it's not valid JSON
-      let jsonString = responseContent.trim();
-      
-      // Sometimes the AI adds markdown code blocks, remove them
-      if (jsonString.startsWith("```json")) {
-        jsonString = jsonString.replace(/```json\n/, "").replace(/\n```$/, "");
-      } else if (jsonString.startsWith("```")) {
-        jsonString = jsonString.replace(/```\n/, "").replace(/\n```$/, "");
-      }
-      
-      // Sometimes AI adds explanatory text before or after the JSON
-      // Try to extract just the JSON array part
-      const jsonArrayMatch = jsonString.match(/\[\s*\{[\s\S]*\}\s*\]/);
-      if (jsonArrayMatch) {
-        jsonString = jsonArrayMatch[0];
-      }
-      
-      roleRecommendations = JSON.parse(jsonString);
-      
-      // Ensure it's an array
-      if (!Array.isArray(roleRecommendations)) {
-        if (typeof roleRecommendations === 'object') {
-          // If it's an object but not an array, try to convert it to an array
-          roleRecommendations = [roleRecommendations];
-        } else {
-          throw new Error("Response is not an array or object");
-        }
-      }
-    } catch (error) {
-      console.error("Error parsing Azure OpenAI response:", error);
-      console.error("Response content:", response.body.choices[0].message.content);
-      
-      // Provide fallback recommendations
-      roleRecommendations = [
-        {
-          "role_title": "Software Developer",
-          "description": "Software developers create applications and systems that run on computers and other devices. They design, code, test, and maintain software solutions for various problems and needs.",
-          "why_it_fits_professionally": "Your technical skills and problem-solving abilities would make you a strong candidate for software development roles. Your experience with analytical thinking aligns well with the core competencies needed.",
-          "why_it_fits_personally": "Your interest in creating solutions and solving complex problems makes software development a fulfilling career path that matches your personal interests."
+      // Make the API call to Azure OpenAI
+      const response = await client.path("chat/completions").post({
+        body: {
+          messages: messages,
+          max_tokens: 1500,
+          model: deploymentName,
         },
-        {
-          "role_title": "Data Analyst",
-          "description": "Data analysts examine datasets to identify trends and draw conclusions. They present findings to help organizations make better business decisions.",
-          "why_it_fits_professionally": "Your analytical thinking skills and attention to detail would serve you well as a data analyst. This role leverages your abilities to find patterns and insights in complex information.",
-          "why_it_fits_personally": "Your curiosity and interest in uncovering insights from information makes data analysis a personally satisfying career that aligns with your values."
-        },
-        {
-          "role_title": "Product Manager",
-          "description": "Product managers oversee the development of products from conception to launch. They define product strategy, gather requirements, and coordinate with different teams to ensure successful delivery.",
-          "why_it_fits_professionally": "Your combination of technical understanding and strategic planning abilities makes product management a good professional fit. This role utilizes both your analytical and communication skills.",
-          "why_it_fits_personally": "Your interest in both the business and technical aspects of products, along with your desire to create meaningful solutions, aligns well with product management."
-        }
-      ];
-    }
+      });
 
-    // Return the recommendations
-    return NextResponse.json({ recommendations: roleRecommendations });
+      if (!response.body) {
+        console.error("No response from Azure OpenAI");
+        return NextResponse.json({ recommendations: defaultRecommendations });
+      }
+
+      // Parse the response
+      let roleRecommendations;
+      try {
+        const responseContent = response.body.choices[0].message.content;
+        console.log("Raw response from Azure OpenAI:", responseContent);
+        
+        // Try to clean the response if it's not valid JSON
+        let jsonString = responseContent.trim();
+        
+        // Sometimes the AI adds markdown code blocks, remove them
+        if (jsonString.startsWith("```json")) {
+          jsonString = jsonString.replace(/```json\n/, "").replace(/\n```$/, "");
+        } else if (jsonString.startsWith("```")) {
+          jsonString = jsonString.replace(/```\n/, "").replace(/\n```$/, "");
+        }
+        
+        // Sometimes AI adds explanatory text before or after the JSON
+        // Try to extract just the JSON array part
+        const jsonArrayMatch = jsonString.match(/\[\s*\{[\s\S]*\}\s*\]/);
+        if (jsonArrayMatch) {
+          jsonString = jsonArrayMatch[0];
+        }
+        
+        roleRecommendations = JSON.parse(jsonString);
+        
+        // Ensure it's an array
+        if (!Array.isArray(roleRecommendations)) {
+          if (typeof roleRecommendations === 'object') {
+            // If it's an object but not an array, try to convert it to an array
+            roleRecommendations = [roleRecommendations];
+          } else {
+            throw new Error("Response is not an array or object");
+          }
+        }
+      } catch (error) {
+        console.error("Error parsing Azure OpenAI response:", error);
+        console.error("Response content:", response.body.choices[0].message.content);
+        
+        // Return fallback recommendations
+        roleRecommendations = defaultRecommendations;
+      }
+
+      // Return the recommendations
+      return NextResponse.json({ recommendations: roleRecommendations });
+      
+    } catch (apiError) {
+      console.error("Error calling Azure OpenAI:", apiError);
+      return NextResponse.json({ recommendations: defaultRecommendations });
+    }
+    
   } catch (error) {
     console.error("Error in API route:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ recommendations: defaultRecommendations });
   }
 }
