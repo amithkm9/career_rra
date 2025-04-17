@@ -11,7 +11,7 @@ export function Hero() {
   const [isQuestionnaireOpen, setIsQuestionnaireOpen] = useState(false)
 
   return (
-    <section id="home" className="relative min-h-screen py-20 md:py-32">
+    <section id="home" className="relative min-h-screen py-12 md:py-20">
       {/* Background Image */}
       <div className="absolute inset-0 z-0 bg-[#f3ebff]">
         {/* Using a solid light purple background color that matches the image */}
@@ -22,7 +22,7 @@ export function Hero() {
           <div className="flex flex-col justify-center space-y-4 animate-fade-in">
             <div className="space-y-2">
               <h1 className="text-3xl font-bold tracking-tighter sm:text-5xl xl:text-6xl/none text-gray-800">
-                You're Not Lost. Just Misdirected.
+                You Didn't Know You Needed Direction. Until Now.
               </h1>
               <p className="max-w-[600px] text-gray-600 md:text-xl">
                 Find the career that was meant for you — and the exact steps to get there.
@@ -37,7 +37,13 @@ export function Hero() {
           </div>
           <div className="flex items-center justify-center animate-scale-in animate-delay-300">
             <div className="relative w-full max-w-[500px] aspect-square">
-              <Image src="/hero-image.png" alt="Person at career crossroads" fill className="object-contain" priority />
+              <Image
+                src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Classment-Hero-MPY8lFgvG6Y03W54sPW374iu9ADSLm.gif"
+                alt="Career path journey from you to your dream career"
+                fill
+                className="object-contain"
+                priority
+              />
             </div>
           </div>
         </div>

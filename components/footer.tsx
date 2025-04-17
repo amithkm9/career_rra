@@ -27,6 +27,12 @@ export function Footer() {
             >
               Terms & Conditions
             </Link>
+            <Link
+              href="/refund-policy"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Refund Policy
+            </Link>
           </div>
           <div className="flex gap-6">
             <Link href="https://x.com/theClassMent" target="_blank" rel="noopener noreferrer">

@@ -14,8 +14,8 @@ export function OpenReplayProvider({ children }: { children: React.ReactNode }) 
     const tracker = initTracker()
 
     // Identify user if logged in
-    if (user?.id) {
-      identifyUser(user.id)
+    if (user?.email) {
+      identifyUser(user.email)
     }
 
     return () => {
