@@ -25,6 +25,15 @@ export function AppHeader() {
         </Link>
 
         <div className="flex items-center gap-4">
+          <Link href="/" className="text-sm font-medium hover:text-primary transition-colors">
+            Home
+          </Link>
+          <Link href="/about" className="text-sm font-medium hover:text-primary transition-colors">
+            About Us
+          </Link>
+          <Link href="/services" className="text-sm font-medium hover:text-primary transition-colors">
+            Services
+          </Link>
           {user && (
             <div className="hidden md:block text-right mr-4">
               <p className="text-sm font-medium">{user.email}</p>

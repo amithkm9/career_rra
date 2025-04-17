@@ -12,7 +12,7 @@ import { Loader2, Mail, AlertCircle } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { toast } from "@/components/ui/use-toast"
 import { useRouter } from "next/navigation"
-import { identifyUser, setUserMetadata } from "@/lib/openreplay"
+import { identifyUser } from "@/lib/openreplay"
 
 interface LoginModalProps {
   isOpen: boolean
@@ -78,10 +78,8 @@ export function LoginModal({ isOpen, onOpenChange }: LoginModalProps) {
       }
 
       // Identify user in OpenReplay
-      if (data.user?.id) {
-        identifyUser(data.user.id)
-        // Add basic metadata
-        setUserMetadata("email", email)
+      if (email) {
+        identifyUser(email)
       }
 
       // Fetch user profile data
