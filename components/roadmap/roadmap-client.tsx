@@ -304,6 +304,7 @@ export function RoadmapClient() {
   const [isProcessing, setIsProcessing] = useState(false)
   const router = useRouter()
   const { user } = useAuth()
+  const [personalizedRoadmap, setPersonalizedRoadmap] = useState<any>(null)
 
   // Fetch the selected role from Supabase
   useEffect(() => {
@@ -314,15 +315,19 @@ export function RoadmapClient() {
       }
 
       try {
-        // Get the user's selected role from profiles
-        const { data, error } = await supabase.from("profiles").select("role_selected").eq("id", user.id).single()
+        // Get the user's selected role and roadmap data from profiles
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("role_selected, roadmap_data")
+          .eq("id", user.id)
+          .single()
 
         if (error) {
           throw error
         }
 
         if (data && data.role_selected) {
-          // Find the role in our predefined roles
+          // Set the selected role
           const roleName = data.role_selected
           const roleData = {
             title: roleName,
@@ -332,6 +337,11 @@ export function RoadmapClient() {
           }
 
           setSelectedRole(roleData)
+
+          // If we have personalized roadmap data, use it
+          if (data.roadmap_data) {
+            setPersonalizedRoadmap(data.roadmap_data)
+          }
         } else {
           // If no role is selected, use default
           setSelectedRole(defaultRole)
@@ -405,7 +415,37 @@ export function RoadmapClient() {
 
   // Get the roadmap content for the selected role
   const roleTitle = selectedRole.title
-  const roadmapContent = roleRoadmaps[roleTitle as keyof typeof roleRoadmaps] || roleRoadmaps["Software Developer"]
+  const defaultRoadmapContent =
+    roleRoadmaps[roleTitle as keyof typeof roleRoadmaps] || roleRoadmaps["Software Developer"]
+
+  // Use personalized roadmap if available, otherwise use default
+  const roadmapContent = personalizedRoadmap
+    ? {
+        description: selectedRole.description,
+        steps: [
+          {
+            title: personalizedRoadmap.step1.title,
+            description: personalizedRoadmap.step1.description,
+            tasks: personalizedRoadmap.step1.tasks,
+          },
+          {
+            title: personalizedRoadmap.step2.title,
+            description: personalizedRoadmap.step2.description,
+            tasks: personalizedRoadmap.step2.tasks,
+          },
+          {
+            title: personalizedRoadmap.step3.title,
+            description: personalizedRoadmap.step3.description,
+            tasks: personalizedRoadmap.step3.tasks,
+          },
+          {
+            title: personalizedRoadmap.step4.title,
+            description: personalizedRoadmap.step4.description,
+            tasks: personalizedRoadmap.step4.tasks,
+          },
+        ],
+      }
+    : defaultRoadmapContent
 
   return (
     <div className="max-w-4xl mx-auto">

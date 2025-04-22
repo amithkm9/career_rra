@@ -8,6 +8,7 @@ import { Loader2, AlertCircle } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/context/auth-context"
 import { Button } from "@/components/ui/button"
+import { LoadingPage } from "@/components/loading-page"
 
 // Define the recommendation interface
 export interface RoleRecommendation {
@@ -20,6 +21,7 @@ export interface RoleRecommendation {
 
 export function RolesClient() {
   const [isLoading, setIsLoading] = useState(true)
+  const [isGeneratingRoadmap, setIsGeneratingRoadmap] = useState(false)
   const [recommendations, setRecommendations] = useState<RoleRecommendation[]>([])
   const [selectedRole, setSelectedRole] = useState<RoleRecommendation | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -46,45 +48,47 @@ export function RolesClient() {
           .eq("user_id", user.id)
           .order("created_at", { ascending: false })
           .limit(3)
-          
+
         // If we have existing recommendations, use them
         if (!existingError && existingData && existingData.length > 0) {
-          console.log("Using existing recommendations from database");
-          setRecommendations(existingData.map(item => ({
-            id: item.id,
-            role_title: item.role_title,
-            description: item.description,
-            why_it_fits_professionally: item.why_it_fits_professionally,
-            why_it_fits_personally: item.why_it_fits_personally,
-          })));
-          setIsLoading(false);
-          return;
+          console.log("Using existing recommendations from database")
+          setRecommendations(
+            existingData.map((item) => ({
+              id: item.id,
+              role_title: item.role_title,
+              description: item.description,
+              why_it_fits_professionally: item.why_it_fits_professionally,
+              why_it_fits_personally: item.why_it_fits_personally,
+            })),
+          )
+          setIsLoading(false)
+          return
         }
 
         // Otherwise, call our API to generate new recommendations
-        console.log("Generating new recommendations from Azure OpenAI");
-        const response = await fetch('/api/recommendations', {
-          method: 'POST',
+        console.log("Generating new recommendations from Azure OpenAI")
+        const response = await fetch("/api/recommendations", {
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({ userId: user.id }),
-        });
+        })
 
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to fetch recommendations');
+          const errorData = await response.json()
+          throw new Error(errorData.error || "Failed to fetch recommendations")
         }
 
-        const data = await response.json();
-        
+        const data = await response.json()
+
         // Store recommendations in state
         const recommendationsWithIds = data.recommendations.map((rec: RoleRecommendation, index: number) => ({
           ...rec,
-          id: index + 1
-        }));
-        
-        setRecommendations(recommendationsWithIds);
+          id: index + 1,
+        }))
+
+        setRecommendations(recommendationsWithIds)
 
         // Store the new recommendations in Supabase for future use
         for (const rec of recommendationsWithIds) {
@@ -93,44 +97,52 @@ export function RolesClient() {
             role_title: rec.role_title,
             description: rec.description,
             why_it_fits_professionally: rec.why_it_fits_professionally,
-            why_it_fits_personally: rec.why_it_fits_personally
-          });
+            why_it_fits_personally: rec.why_it_fits_personally,
+          })
         }
-
       } catch (error) {
-        console.error("Error fetching recommendations:", error);
-        setError(error instanceof Error ? error.message : "Failed to load recommendations");
+        console.error("Error fetching recommendations:", error)
+        setError(error instanceof Error ? error.message : "Failed to load recommendations")
         // Use fallback data in case of error
         setRecommendations([
           {
             id: 1,
             role_title: "Software Developer",
-            description: "Software developers create applications and systems that run on computers and other devices. They design, code, test, and maintain software solutions across various industries.",
-            why_it_fits_professionally: "Based on your skills and background, software development allows you to leverage your analytical thinking and problem-solving abilities. Your interest in technology and logic-based work aligns well with this career path.",
-            why_it_fits_personally: "Your preference for creative problem-solving and building things makes software development a good match. It offers the intellectual challenges you enjoy while providing opportunities for continuous learning."
+            description:
+              "Software developers create applications and systems that run on computers and other devices. They design, code, test, and maintain software solutions across various industries.",
+            why_it_fits_professionally:
+              "Based on your skills and background, software development allows you to leverage your analytical thinking and problem-solving abilities. Your interest in technology and logic-based work aligns well with this career path.",
+            why_it_fits_personally:
+              "Your preference for creative problem-solving and building things makes software development a good match. It offers the intellectual challenges you enjoy while providing opportunities for continuous learning.",
           },
           {
             id: 2,
             role_title: "Data Analyst",
-            description: "Data analysts collect, process, and analyze data to help organizations make better decisions. They work with large datasets to identify trends, create visualizations, and generate insights.",
-            why_it_fits_professionally: "Your analytical skills and attention to detail would be valuable assets in data analysis. Your background demonstrates comfort with numbers and logical reasoning needed in this field.",
-            why_it_fits_personally: "Your interest in understanding patterns and solving complex problems aligns well with data analysis. This role provides the opportunity to make a meaningful impact through data-driven insights."
+            description:
+              "Data analysts collect, process, and analyze data to help organizations make better decisions. They work with large datasets to identify trends, create visualizations, and generate insights.",
+            why_it_fits_professionally:
+              "Your analytical skills and attention to detail would be valuable assets in data analysis. Your background demonstrates comfort with numbers and logical reasoning needed in this field.",
+            why_it_fits_personally:
+              "Your interest in understanding patterns and solving complex problems aligns well with data analysis. This role provides the opportunity to make a meaningful impact through data-driven insights.",
           },
           {
             id: 3,
             role_title: "Product Manager",
-            description: "Product managers oversee the development and strategy of products throughout their lifecycle. They work across teams to ensure products meet market needs and business objectives.",
-            why_it_fits_professionally: "Your combination of technical understanding and communication skills is ideal for product management. Your experience demonstrates the ability to collaborate and think strategically.",
-            why_it_fits_personally: "Your interest in both technology and business makes product management a natural fit. This role combines creative thinking with strategic planning, matching your desire for varied and impactful work."
-          }
-        ]);
+            description:
+              "Product managers oversee the development and strategy of products throughout their lifecycle. They work across teams to ensure products meet market needs and business objectives.",
+            why_it_fits_professionally:
+              "Your combination of technical understanding and communication skills is ideal for product management. Your experience demonstrates the ability to collaborate and think strategically.",
+            why_it_fits_personally:
+              "Your interest in both technology and business makes product management a natural fit. This role combines creative thinking with strategic planning, matching your desire for varied and impactful work.",
+          },
+        ])
       } finally {
-        setIsLoading(false);
+        setIsLoading(false)
       }
-    };
+    }
 
-    fetchRecommendations();
-  }, [user]);
+    fetchRecommendations()
+  }, [user])
 
   const handleSelectRole = async (role: RoleRecommendation) => {
     if (!user) {
@@ -143,6 +155,10 @@ export function RolesClient() {
     }
 
     try {
+      // Set generating roadmap state to true to show loading page
+      setIsGeneratingRoadmap(true)
+      setSelectedRole(role)
+
       // Update the role_selected field in the profiles table
       const { error } = await supabase
         .from("profiles")
@@ -155,23 +171,48 @@ export function RolesClient() {
         throw error
       }
 
+      // Generate personalized roadmap
+      const roadmapResponse = await fetch("/api/generate-roadmap", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          roleTitle: role.role_title,
+        }),
+      })
+
+      if (!roadmapResponse.ok) {
+        const errorData = await roadmapResponse.json()
+        throw new Error(errorData.error || "Failed to generate roadmap")
+      }
+
       toast({
         title: "Role selected",
         description: `You've selected ${role.role_title} as your career path.`,
       })
 
-      setSelectedRole(role)
-
       // Redirect to roadmap
       router.push("/roadmap")
     } catch (error) {
       console.error("Error in role selection:", error)
+      setIsGeneratingRoadmap(false)
       toast({
         title: "Error",
         description: "There was a problem processing your selection. Please try again.",
         variant: "destructive",
       })
     }
+  }
+
+  if (isGeneratingRoadmap && selectedRole) {
+    return (
+      <LoadingPage
+        title={`Generating Your ${selectedRole.role_title} Roadmap`}
+        message="We're creating a personalized career roadmap based on your profile and selected role. This may take a moment..."
+      />
+    )
   }
 
   if (isLoading) {
@@ -193,9 +234,7 @@ export function RolesClient() {
             <p className="text-red-600 mt-1">{error}</p>
           </div>
         </div>
-        <Button onClick={() => router.push("/discovery")}>
-          Return to Discovery
-        </Button>
+        <Button onClick={() => router.push("/discovery")}>Return to Discovery</Button>
       </div>
     )
   }

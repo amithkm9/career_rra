@@ -5,7 +5,7 @@ import { ArrowRight, Heart, Briefcase } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { trackEvent, setUserMetadata } from "@/lib/openreplay"
-import { RoleRecommendation } from "./roles-client"
+import type { RoleRecommendation } from "./roles-client"
 
 interface RoleRecommendationsProps {
   recommendations: RoleRecommendation[]
@@ -36,9 +36,9 @@ export function RoleRecommendations({ recommendations, onSelectRole, isLoading }
       await onSelectRole(role)
     } catch (error) {
       console.error("Error saving role:", error)
-    } finally {
       setSavingRole(false)
     }
+    // Note: We don't set savingRole to false here because the page will redirect
   }
 
   const currentRecommendation = recommendations[currentIndex]
@@ -120,7 +120,7 @@ export function RoleRecommendations({ recommendations, onSelectRole, isLoading }
             {savingRole ? (
               <span className="flex items-center gap-2">
                 <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
-                Selecting...
+                Generating Roadmap...
               </span>
             ) : isLoading ? (
               <span className="flex items-center gap-2">
