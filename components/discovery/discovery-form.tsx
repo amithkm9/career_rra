@@ -13,6 +13,7 @@ import { toast } from "@/components/ui/use-toast"
 import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/context/auth-context"
 import { trackEvent } from "@/lib/openreplay"
+import { ResumeParsedStatus } from "./resume-parsing-status"
 
 // Define the structure of our discovery data
 interface DiscoveryData {
@@ -44,7 +45,7 @@ export function DiscoveryForm() {
   const [sections, setSections] = useState({
     interests: true,
     skills: false,
-    values: false
+    values: false,
   })
 
   // Selected items state
@@ -60,6 +61,10 @@ export function DiscoveryForm() {
   // Resume path after upload (for internal reference)
   const [resumePath, setResumePath] = useState<string | null>(null)
 
+  const [resumeParsingStatus, setResumeParsingStatus] = useState<"idle" | "parsing" | "success" | "error">("idle")
+  const [parsedResumeData, setParsedResumeData] = useState<any>(null)
+  const [resumeParsingError, setResumeParsingError] = useState<string | null>(null)
+
   // Fetch user data on component mount
   useEffect(() => {
     const fetchUserData = async () => {
@@ -71,7 +76,7 @@ export function DiscoveryForm() {
       try {
         const { data, error } = await supabase
           .from("profiles")
-          .select("discovery_data, resume_link")
+          .select("discovery_data, resume_link, resume_parsed, resume_structured_data")
           .eq("id", user.id)
           .single()
 
@@ -81,12 +86,12 @@ export function DiscoveryForm() {
 
         if (data && data.discovery_data) {
           const discoveryData = data.discovery_data as DiscoveryData
-          
+
           // Set selected items
           setSelectedInterests(discoveryData.interests.selected || [])
           setSelectedSkills(discoveryData.skills.selected || [])
           setSelectedValues(discoveryData.values.selected || [])
-          
+
           // Set additional info
           setInterestsInfo(discoveryData.interests.additional_info || "")
           setSkillsInfo(discoveryData.skills.additional_info || "")
@@ -96,6 +101,12 @@ export function DiscoveryForm() {
         if (data && data.resume_link) {
           // The resume has already been uploaded
           setUploadStatus("success")
+
+          // If resume is parsed, show the parsed data
+          if (data.resume_parsed && data.resume_structured_data) {
+            setResumeParsingStatus("success")
+            setParsedResumeData(data.resume_structured_data)
+          }
         }
       } catch (error) {
         console.error("Error fetching user data:", error)
@@ -112,10 +123,10 @@ export function DiscoveryForm() {
     fetchUserData()
   }, [user])
 
-  const toggleSection = (section: 'interests' | 'skills' | 'values') => {
-    setSections(prev => ({
+  const toggleSection = (section: "interests" | "skills" | "values") => {
+    setSections((prev) => ({
       ...prev,
-      [section]: !prev[section]
+      [section]: !prev[section],
     }))
   }
 
@@ -153,6 +164,141 @@ export function DiscoveryForm() {
     }
   }
 
+  // Add this function to implement retry logic for resume parsing
+  const handleParseResume = async (filePath: string, retryCount = 0) => {
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to parse your resume",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setResumeParsingStatus("parsing")
+    setResumeParsingError(null)
+
+    try {
+      // Get a signed URL for the uploaded resume
+      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+        .from("resumes")
+        .createSignedUrl(filePath, 3600) // 1 hour expiry
+
+      if (signedUrlError) {
+        console.error("Error creating signed URL:", signedUrlError)
+        throw new Error(`Failed to create signed URL: ${signedUrlError.message}`)
+      }
+
+      const resumeUrl = signedUrlData.signedUrl
+
+      // Call the resume parsing API
+      const response = await fetch("/api/parse-resume", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          resumeUrl,
+        }),
+      })
+
+      // First check if the response is ok
+      if (!response.ok) {
+        // Try to get error details from response
+        let errorMessage = `${response.status}: ${response.statusText}`
+
+        try {
+          // Try to parse the response as JSON
+          const errorData = await response.json()
+          if (errorData && errorData.error) {
+            errorMessage = `${errorData.error}: ${errorData.details || ""}`
+          }
+        } catch (jsonError) {
+          // If we can't parse JSON, try to get text
+          try {
+            const textError = await response.text()
+            if (textError) {
+              errorMessage = textError.substring(0, 100) // Limit length
+            }
+          } catch (textError) {
+            // If we can't get text either, use the status
+            console.error("Could not parse error response as text:", textError)
+          }
+        }
+
+        // If this is a server error and we haven't retried too many times, retry
+        if (response.status >= 500 && retryCount < 2) {
+          console.log(`Retrying resume parsing (attempt ${retryCount + 1})...`)
+          // Wait a bit before retrying
+          await new Promise((resolve) => setTimeout(resolve, 2000))
+          return handleParseResume(filePath, retryCount + 1)
+        }
+
+        throw new Error(errorMessage)
+      }
+
+      // Now safely parse the JSON response
+      let data
+      try {
+        data = await response.json()
+      } catch (jsonError) {
+        console.error("Error parsing JSON response:", jsonError)
+        throw new Error("Invalid response format from server")
+      }
+
+      if (!data || !data.success) {
+        throw new Error(data?.error || "Unknown error parsing resume")
+      }
+
+      setParsedResumeData(data.resumeData)
+      setResumeParsingStatus("success")
+
+      toast({
+        title: "Resume parsed successfully",
+        description:
+          "Your resume has been analyzed and the information will be used to improve your career recommendations.",
+      })
+
+      // Track resume parsing in OpenReplay - wrap in try/catch to prevent errors
+      try {
+        trackEvent("resume_parsed", {
+          success: true,
+        })
+      } catch (trackError) {
+        console.error("Error tracking event:", trackError)
+      }
+
+      return data.resumeData
+    } catch (error) {
+      console.error("Error parsing resume:", error)
+
+      setResumeParsingStatus("error")
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      setResumeParsingError(errorMessage)
+
+      toast({
+        title: "Resume parsing failed",
+        description:
+          "There was an error analyzing your resume. Your other information will still be used for recommendations.",
+        variant: "destructive",
+      })
+
+      // Track resume parsing error in OpenReplay - wrap in try/catch to prevent errors
+      try {
+        trackEvent("resume_parsed", {
+          success: false,
+          error: errorMessage,
+        })
+      } catch (trackError) {
+        console.error("Error tracking event:", trackError)
+      }
+
+      return null
+    }
+  }
+
+  // Update the uploadFile function to include resume parsing
   const uploadFile = async (file: File) => {
     if (!user) {
       toast({
@@ -188,14 +334,23 @@ export function DiscoveryForm() {
 
       toast({
         title: "Resume uploaded",
-        description: "Your resume has been uploaded successfully",
+        description: "Your resume has been uploaded successfully and is being analyzed...",
       })
 
       // Track CV upload in OpenReplay
-      trackEvent("cv_uploaded", {
-        fileType: file.type,
-        fileSize: file.size,
-      })
+      try {
+        trackEvent("cv_uploaded", {
+          fileType: file.type,
+          fileSize: file.size,
+        })
+      } catch (trackError) {
+        console.error("Error tracking CV upload:", trackError)
+      }
+
+      // Parse the resume after upload
+      if (fileExt === "pdf" || fileExt === "docx") {
+        handleParseResume(filePath)
+      }
 
       return filePath
     } catch (error: any) {
@@ -357,13 +512,13 @@ export function DiscoveryForm() {
     <form onSubmit={handleSubmit} className="space-y-12">
       {/* Interests Section */}
       <div className="border rounded-lg p-6 bg-white shadow-sm">
-        <div className="flex justify-between items-center cursor-pointer" onClick={() => toggleSection('interests')}>
+        <div className="flex justify-between items-center cursor-pointer" onClick={() => toggleSection("interests")}>
           <h2 className="text-2xl font-semibold">Interests</h2>
           <Button variant="ghost" size="sm" type="button">
             {sections.interests ? <ChevronUp className="h-6 w-6" /> : <ChevronDown className="h-6 w-6" />}
           </Button>
         </div>
-        
+
         {sections.interests && (
           <InterestsSection
             selectedInterests={selectedInterests}
@@ -377,13 +532,13 @@ export function DiscoveryForm() {
 
       {/* Skills Section */}
       <div className="border rounded-lg p-6 bg-white shadow-sm">
-        <div className="flex justify-between items-center cursor-pointer" onClick={() => toggleSection('skills')}>
+        <div className="flex justify-between items-center cursor-pointer" onClick={() => toggleSection("skills")}>
           <h2 className="text-2xl font-semibold">Skills</h2>
           <Button variant="ghost" size="sm" type="button">
             {sections.skills ? <ChevronUp className="h-6 w-6" /> : <ChevronDown className="h-6 w-6" />}
           </Button>
         </div>
-        
+
         {sections.skills && (
           <SkillsSection
             selectedSkills={selectedSkills}
@@ -397,13 +552,13 @@ export function DiscoveryForm() {
 
       {/* Values Section */}
       <div className="border rounded-lg p-6 bg-white shadow-sm">
-        <div className="flex justify-between items-center cursor-pointer" onClick={() => toggleSection('values')}>
+        <div className="flex justify-between items-center cursor-pointer" onClick={() => toggleSection("values")}>
           <h2 className="text-2xl font-semibold">Values</h2>
           <Button variant="ghost" size="sm" type="button">
             {sections.values ? <ChevronUp className="h-6 w-6" /> : <ChevronDown className="h-6 w-6" />}
           </Button>
         </div>
-        
+
         {sections.values && (
           <ValuesSection
             selectedValues={selectedValues}
@@ -481,6 +636,9 @@ export function DiscoveryForm() {
                   setSelectedFile(null)
                   setUploadStatus("idle")
                   setResumePath(null)
+                  setResumeParsingStatus("idle")
+                  setParsedResumeData(null)
+                  setResumeParsingError(null)
                 }}
               >
                 Upload a different file
@@ -546,6 +704,11 @@ export function DiscoveryForm() {
             </>
           )}
         </div>
+        <ResumeParsedStatus
+          status={resumeParsingStatus}
+          resumeData={parsedResumeData}
+          error={resumeParsingError || uploadError}
+        />
       </div>
 
       {/* Submit Button */}

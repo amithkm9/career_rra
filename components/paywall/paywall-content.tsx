@@ -7,9 +7,11 @@ import { Card, CardContent } from "@/components/ui/card"
 import { toast } from "@/components/ui/use-toast"
 import { useRouter } from "next/navigation"
 import { trackEvent } from "@/lib/openreplay"
+import { WaitlistModal } from "./waitlist-modal"
 
 export function PaywallContent() {
   const [isLoading, setIsLoading] = useState(false)
+  const [isWaitlistModalOpen, setIsWaitlistModalOpen] = useState(false)
   const router = useRouter()
 
   const handleBackToRoadmap = () => {
@@ -23,30 +25,18 @@ export function PaywallContent() {
       // Track the premium roadmap payment attempt
       trackEvent("plan_selected", {
         plan_selected: "Premium Roadmap",
-        price: "2499",
+        price: "3499",
         currency: "INR",
         subscription_period: "6 months",
       })
 
-      // In a real implementation, this would redirect to a payment processor
-      toast({
-        title: "Payment Processing",
-        description: "This would redirect to a payment gateway in a production environment.",
-      })
-
-      // Simulate payment processing
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-
-      // For demo purposes, just show a success message
-      toast({
-        title: "Payment Demo",
-        description: "In a real app, you would be redirected to a payment processor.",
-      })
+      // Instead of processing payment, open the waitlist modal
+      setIsWaitlistModalOpen(true)
     } catch (error) {
-      console.error("Error processing payment:", error)
+      console.error("Error:", error)
       toast({
         title: "Error",
-        description: "There was an error processing your payment. Please try again.",
+        description: "There was an unexpected error. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -121,9 +111,9 @@ export function PaywallContent() {
                 <h2 className="text-3xl font-bold mb-2">Premium Roadmap</h2>
                 <p className="text-gray-600 mb-4">6-Month Career Acceleration Program</p>
                 <div className="flex items-center justify-center">
-                  <span className="text-5xl font-bold">₹2,499</span>
+                  <span className="text-5xl font-bold">₹3,499</span>
                   <span className="text-gray-500 ml-2">/6 months</span>
-                  <span className="ml-2 text-lg text-gray-400 line-through">₹10,000</span>
+                  <span className="ml-2 text-lg text-gray-400 line-through">₹45,000</span>
                 </div>
                 <p className="text-sm text-green-600 font-medium mt-1">75% off - Limited time offer</p>
               </div>
@@ -188,6 +178,9 @@ export function PaywallContent() {
           Back To Roadmap
         </Button>
       </div>
+
+      {/* Waitlist Modal */}
+      <WaitlistModal isOpen={isWaitlistModalOpen} onClose={() => setIsWaitlistModalOpen(false)} />
     </div>
   )
 }
