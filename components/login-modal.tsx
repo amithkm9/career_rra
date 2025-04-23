@@ -22,6 +22,7 @@ interface LoginModalProps {
 export function LoginModal({ isOpen, onOpenChange }: LoginModalProps) {
   const router = useRouter()
   const [email, setEmail] = useState("")
+  const [phone, setPhone] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [otpSent, setOtpSent] = useState(false)
   const [otp, setOtp] = useState("")
@@ -59,7 +60,7 @@ export function LoginModal({ isOpen, onOpenChange }: LoginModalProps) {
     }
   }
 
-  // Update the handleVerifyOtp function to check for stored questionnaire data
+  // Update the handleVerifyOtp function to save phone number to Supabase
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
@@ -80,6 +81,20 @@ export function LoginModal({ isOpen, onOpenChange }: LoginModalProps) {
       // Identify user in OpenReplay
       if (email) {
         identifyUser(email)
+      }
+
+      // Save phone number to the profiles table
+      if (data.user && phone) {
+        const { error: updateError } = await supabase
+          .from("profiles")
+          .update({
+            phone_number: phone
+          })
+          .eq("id", data.user.id)
+
+        if (updateError) {
+          console.error("Error saving phone number:", updateError)
+        }
       }
 
       // Fetch user profile data
@@ -164,6 +179,7 @@ export function LoginModal({ isOpen, onOpenChange }: LoginModalProps) {
 
   const resetForm = () => {
     setEmail("")
+    setPhone("")
     setOtp("")
     setOtpSent(false)
     setError(null)
@@ -248,6 +264,19 @@ export function LoginModal({ isOpen, onOpenChange }: LoginModalProps) {
               </form>
             ) : (
               <form onSubmit={handleEmailLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number</Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder="+91 9876543210"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    disabled={isLoading}
+                  />
+                  <p className="text-xs text-muted-foreground">Enter your phone number for communication purposes</p>
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
                   <Input
