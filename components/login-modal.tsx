@@ -265,7 +265,7 @@ export function LoginModal({ isOpen, onOpenChange }: LoginModalProps) {
             ) : (
               <form onSubmit={handleEmailLogin} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number</Label>
+                  <Label htmlFor="phone">Phone Number (Optional)</Label>
                   <Input
                     id="phone"
                     type="tel"
