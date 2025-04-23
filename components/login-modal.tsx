@@ -304,7 +304,7 @@ export function LoginModal({ isOpen, onOpenChange }: LoginModalProps) {
                       Sending...
                     </>
                   ) : (
-                    "Send Verification Code"
+                    "Send Email Verification Code"
                   )}
                 </Button>
               </form>
