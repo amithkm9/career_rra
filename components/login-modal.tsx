@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -27,6 +27,28 @@ export function LoginModal({ isOpen, onOpenChange }: LoginModalProps) {
   const [otpSent, setOtpSent] = useState(false)
   const [otp, setOtp] = useState("")
   const [error, setError] = useState<string | null>(null)
+  const [googlePhoneNumber, setGooglePhoneNumber] = useState("")
+  const [showGooglePhoneInput, setShowGooglePhoneInput] = useState(false)
+
+  // Listen for auth state changes to detect Google login success
+  useEffect(() => {
+    const handleAuthStateChange = async ({ event }: { event: string }) => {
+      if (event === 'SIGNED_IN') {
+        // Check if this was a Google sign in
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session?.provider_token && session.provider_token.includes('google')) {
+          // Show phone input for Google users
+          setShowGooglePhoneInput(true)
+        }
+      }
+    }
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthStateChange)
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [])
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -177,12 +199,127 @@ export function LoginModal({ isOpen, onOpenChange }: LoginModalProps) {
     }
   }
 
+  const handleGooglePhoneSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
+
+    try {
+      // Get the current user
+      const { data: { user } } = await supabase.auth.getUser()
+
+      if (!user) {
+        throw new Error("User not found")
+      }
+
+      // Update the user's profile with the phone number
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          phone_number: googlePhoneNumber
+        })
+        .eq("id", user.id)
+
+      if (error) {
+        throw error
+      }
+
+      // Fetch user profile data for redirection
+      const { data: profileData, error: profileError } = await supabase
+        .from("profiles")
+        .select("discovery_done, role_selected")
+        .eq("id", user.id)
+        .single()
+
+      if (profileError) {
+        console.error("Error fetching profile:", profileError)
+      }
+
+      toast({
+        title: "Phone number saved",
+        description: "Your phone number has been saved successfully",
+      })
+
+      // Close the modal
+      onOpenChange(false)
+
+      // Redirect based on profile data
+      if (profileData?.role_selected) {
+        router.push("/dashboard")
+      } else if (profileData?.discovery_done) {
+        router.push("/roles")
+      } else {
+        router.push("/discovery")
+      }
+    } catch (err) {
+      console.error("Error saving phone number:", err)
+      setError("Failed to save phone number. Please try again.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const resetForm = () => {
     setEmail("")
     setPhone("")
     setOtp("")
     setOtpSent(false)
     setError(null)
+    setGooglePhoneNumber("")
+    setShowGooglePhoneInput(false)
+  }
+
+  // If we need to collect phone after Google auth
+  if (showGooglePhoneInput) {
+    return (
+      <Dialog
+        open={isOpen}
+        onOpenChange={(open) => {
+          if (!open) resetForm()
+          onOpenChange(open)
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>One more step</DialogTitle>
+            <DialogDescription>Please provide your phone number to complete your registration</DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleGooglePhoneSubmit} className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="googlePhone">Phone Number</Label>
+              <Input
+                id="googlePhone"
+                type="tel"
+                placeholder="+91 9876543210"
+                value={googlePhoneNumber}
+                onChange={(e) => setGooglePhoneNumber(e.target.value)}
+                required
+                disabled={isLoading}
+              />
+              <p className="text-xs text-muted-foreground">We'll use this number for important communications</p>
+            </div>
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-md flex items-center gap-2 text-sm">
+                <AlertCircle className="h-4 w-4" />
+                {error}
+              </div>
+            )}
+
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Continue"
+              )}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+    )
   }
 
   return (
@@ -314,6 +451,18 @@ export function LoginModal({ isOpen, onOpenChange }: LoginModalProps) {
           <TabsContent value="google" className="mt-4">
             <div className="text-center py-2">
               <p className="mb-4">Continue with your Google account</p>
+              
+              <div className="space-y-2 mb-4">
+                <Label htmlFor="googlePhoneField">Phone Number (Optional)</Label>
+                <Input
+                  id="googlePhoneField"
+                  type="tel"
+                  placeholder="+91 9876543210"
+                  value={googlePhoneNumber}
+                  onChange={(e) => setGooglePhoneNumber(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">We'll use this for important communications</p>
+              </div>
 
               {error && (
                 <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-md flex items-center gap-2 text-sm mb-4">

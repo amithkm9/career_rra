@@ -4,11 +4,14 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Loader2 } from "lucide-react"
 import { supabase } from "@/lib/supabase"
+import { identifyUser } from "@/lib/openreplay"
 
 export default function AuthCallbackPage() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(true)
-
+  const [showPhonePrompt, setShowPhonePrompt] = useState(false)
+  const [phoneNumber, setPhoneNumber] = useState("")
+  
   useEffect(() => {
     const handleRedirect = async () => {
       try {
@@ -18,6 +21,31 @@ export default function AuthCallbackPage() {
         } = await supabase.auth.getSession()
 
         if (session?.user) {
+          // Identify user in OpenReplay
+          if (session.user.email) {
+            identifyUser(session.user.email)
+          }
+          
+          // Get phone number from localStorage if we have it (for Google auth)
+          const googlePhoneNumber = localStorage.getItem("google_phone_number")
+          
+          if (googlePhoneNumber) {
+            // Save phone number to profile
+            const { error } = await supabase
+              .from("profiles")
+              .update({
+                phone_number: googlePhoneNumber
+              })
+              .eq("id", session.user.id)
+              
+            if (error) {
+              console.error("Error saving phone number:", error)
+            }
+            
+            // Clear from localStorage
+            localStorage.removeItem("google_phone_number")
+          }
+
           // Fetch user profile data
           const { data: profileData, error: profileError } = await supabase
             .from("profiles")
