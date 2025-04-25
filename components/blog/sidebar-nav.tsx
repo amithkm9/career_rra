@@ -1,13 +1,15 @@
 "use client"
 
 // components/blog/sidebar-nav.tsx
+import { useState } from "react";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Search, Tag, Bookmark } from "lucide-react";
-import { useState } from "react";
+import { Search, Tag, Bookmark, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { toast } from "@/components/ui/use-toast";
+import { supabase } from "@/lib/supabase";
 import type { Category } from "@/types/blog";
 
 interface SidebarNavProps {
@@ -17,11 +19,103 @@ interface SidebarNavProps {
 export default function SidebarNav({ categories = [] }: SidebarNavProps) {
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
+  const [email, setEmail] = useState("");
+  const [isSubscribing, setIsSubscribing] = useState(false);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchTerm.trim()) {
       router.push(`/blog/search?q=${encodeURIComponent(searchTerm.trim())}`);
+    }
+  };
+
+  const handleSubscribe = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validate email
+    if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
+      toast({
+        title: "Invalid email",
+        description: "Please enter a valid email address",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSubscribing(true);
+
+    try {
+      // Check if email already exists in the profiles table with subscription
+      const { data: existingProfiles, error: checkError } = await supabase
+        .from("profiles")
+        .select("id, subscribed_to_blog")
+        .eq("email", email);
+
+      if (checkError) {
+        console.error("Error checking existing profile:", checkError);
+        throw new Error("Failed to check subscription status");
+      }
+
+      // If profile exists and already subscribed
+      if (existingProfiles && existingProfiles.length > 0 && existingProfiles[0].subscribed_to_blog) {
+        toast({
+          title: "Already subscribed",
+          description: "This email is already subscribed to our blog updates.",
+        });
+        setEmail("");
+        return;
+      }
+      
+      // If profile exists but not subscribed to blog
+      if (existingProfiles && existingProfiles.length > 0) {
+        // Update existing profile to subscribe to blog
+        const { error: updateError } = await supabase
+          .from("profiles")
+          .update({
+            subscribed_to_blog: true,
+            blog_subscription_date: new Date().toISOString()
+          })
+          .eq("id", existingProfiles[0].id);
+          
+        if (updateError) {
+          console.error("Error updating profile:", updateError);
+          throw new Error("Failed to save subscription");
+        }
+      } else {
+        // Create new profile with blog subscription
+        const { error: insertError } = await supabase
+          .from("profiles")
+          .insert([
+            {
+              email,
+              subscribed_to_blog: true,
+              blog_subscription_date: new Date().toISOString()
+            },
+          ]);
+
+        if (insertError) {
+          console.error("Error inserting profile:", insertError);
+          throw new Error("Failed to save subscription");
+        }
+      }
+
+      // Success message
+      toast({
+        title: "Subscribed!",
+        description: "You've been successfully subscribed to our blog updates.",
+      });
+
+      // Clear the input
+      setEmail("");
+    } catch (error) {
+      console.error('Subscription error:', error);
+      toast({
+        title: "Subscription failed",
+        description: error instanceof Error ? error.message : "Something went wrong, please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubscribing(false);
     }
   };
 
@@ -90,14 +184,28 @@ export default function SidebarNav({ categories = [] }: SidebarNavProps) {
           <p className="text-sm text-gray-600 mb-4">
             Stay up to date with our latest blog posts and updates.
           </p>
-          <form className="space-y-2">
+          <form className="space-y-2" onSubmit={handleSubscribe}>
             <Input
               type="email"
               placeholder="Enter your email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               required
+              disabled={isSubscribing}
             />
-            <Button type="submit" className="w-full">
-              Subscribe
+            <Button 
+              type="submit" 
+              className="w-full"
+              disabled={isSubscribing}
+            >
+              {isSubscribing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Subscribing...
+                </>
+              ) : (
+                "Subscribe"
+              )}
             </Button>
           </form>
         </CardContent>

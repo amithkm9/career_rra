@@ -4,7 +4,12 @@
 **/
 import { defineCliConfig } from 'sanity/cli'
 
-const projectId = process.env.NEXT_PUBLIC_SANITY_PROJECT_ID
-const dataset = process.env.NEXT_PUBLIC_SANITY_DATASET
-
-export default defineCliConfig({ api: { projectId, dataset } })
+// Add this line to define the studio host
+export default defineCliConfig({
+  api: {
+    projectId: 'dz88krr6',
+    dataset: 'production'
+  },
+  // Add this line to fix the error
+  studioHost: 'classment-blog'
+})
