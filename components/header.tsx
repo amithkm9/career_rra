@@ -97,6 +97,11 @@ export function Header() {
       onClick: undefined,
     },
     {
+      name: "Blog", // Add this item
+      href: "/blog",
+      onClick: undefined,
+    },
+    {
       name: "Services",
       href: "/services",
       onClick: undefined,
