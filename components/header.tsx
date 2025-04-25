@@ -32,6 +32,8 @@ export function Header() {
       setActiveNavItem("Services")
     } else if (pathname === "/summer-bootcamp") {
       setActiveNavItem("Students")
+    } else if (pathname.startsWith("/blog")) {
+      setActiveNavItem("Blog")
     }
   }, [pathname])
 
@@ -120,10 +122,10 @@ export function Header() {
   return (
     <>
       <header className="sticky top-0 z-50 w-full border-b bg-gray-100 backdrop-blur supports-[backdrop-filter]:bg-gray-100/95">
-        <div className="container flex h-16 items-center justify-between">
+        <div className="container mx-auto px-4 py-3 flex justify-between items-center">
           <Link href="/" className="flex items-center gap-2">
             <Image src="/logo-without-name.png" alt="ClassMent Logo" width={40} height={40} className="h-8 w-auto" />
-            <span className="font-bold text-xl">ClassMent</span>
+            <span className="text-xl font-bold">ClassMent</span>
           </Link>
 
           <div className="md:hidden">

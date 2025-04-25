@@ -45,7 +45,7 @@ export default function SidebarNav({ categories = [] }: SidebarNavProps) {
     setIsSubscribing(true);
 
     try {
-      // Check if email already exists in the profiles table with subscription
+      // First, check if this email already exists in the profiles table
       const { data: existingProfiles, error: checkError } = await supabase
         .from("profiles")
         .select("id, subscribed_to_blog")
