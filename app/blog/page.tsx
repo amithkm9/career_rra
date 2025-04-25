@@ -16,6 +16,9 @@ async function FeaturedPosts() {
   try {
     const featuredPosts = await getFeaturedPosts();
     
+    // Debug log to see how many featured posts are coming back
+    console.log("Featured posts count:", featuredPosts?.length || 0);
+    
     if (!featuredPosts || featuredPosts.length === 0) {
       return null;
     }
@@ -43,6 +46,10 @@ async function FeaturedPosts() {
 async function AllPosts() {
   try {
     const posts = await getAllPosts();
+    
+    // Debug log to see how many posts are coming back
+    console.log("All posts count:", posts?.length || 0);
+    console.log("All posts data:", JSON.stringify(posts));
     
     if (!posts || posts.length === 0) {
       return (

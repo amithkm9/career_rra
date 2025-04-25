@@ -23,21 +23,29 @@ export const urlFor = (source: any) => builder.image(source);
 
 // Helper functions to fetch data with GROQ queries
 export async function getAllPosts() {
-  return sanityClient.fetch(
-    `*[_type == "post"] | order(publishedAt desc) {
-      _id,
-      title,
-      slug,
-      excerpt,
-      "categories": categories[]->title,
-      mainImage,
-      publishedAt,
-      "author": author->{name, slug, image},
-      featured,
-      readTime
-    }`
-  );
-}
+    try {
+      const posts = await sanityClient.fetch(
+        `*[_type == "post"] | order(publishedAt desc) {
+          _id,
+          title,
+          slug,
+          excerpt,
+          "categories": categories[]->{ _id, title, slug, color },
+          mainImage,
+          publishedAt,
+          "author": author->{name, slug, image},
+          featured,
+          readTime
+        }`
+      );
+      
+      console.log("Sanity returned posts count:", posts?.length || 0);
+      return posts;
+    } catch (error) {
+      console.error("Error in getAllPosts:", error);
+      return [];
+    }
+  }
 
 export async function getFeaturedPosts() {
   return sanityClient.fetch(
