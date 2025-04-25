@@ -1,3 +1,5 @@
+"use client"
+
 // components/blog/sidebar-nav.tsx
 import Link from "next/link";
 import { Input } from "@/components/ui/input";

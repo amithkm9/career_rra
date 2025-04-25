@@ -1,3 +1,4 @@
+"use client"
 // components/blog/blog-post-card.tsx
 import Image from 'next/image';
 import Link from 'next/link';

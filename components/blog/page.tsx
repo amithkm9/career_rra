@@ -1,3 +1,4 @@
+"use client"
 // app/blog/page.tsx
 import { Suspense } from "react";
 import { Metadata } from "next";
